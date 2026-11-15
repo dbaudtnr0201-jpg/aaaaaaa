@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>도형 잡기 챌린지</title>
+
+<!-- =====================================================================
+     ★ 설정 ★  GitHub Pages에 올리기만 하면 됩니다. (별도 서버·가입 불필요)
+     GAME_SECONDS : 게임 시간(초)
+     ===================================================================== -->
+<script>
+window.GAME_CONFIG = {
+  GAME_SECONDS: 60,
+  PEER_SERVER: null   // 고급 설정: 직접 운영하는 PeerJS 서버가 있을 때만 {host, port, path, secure}
+};
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#121214;--panel:#1b1b1f;--line:#2c2c33;--ink:#f4f1ea;--dim:#a19f99;--yel:#ffd23f;--teal:#1ec8b0;--red:#ff4d3d;--pink:#ff4fa3;--org:#ff8a3d}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans KR",system-ui,sans-serif;overflow:hidden}
+[hidden]{display:none!important}
+#app{display:grid;grid-template-columns:minmax(0,1fr) 320px;height:100vh;height:100dvh}
+#stage{position:relative;background:#0b0b0d;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;touch-action:none;-webkit-user-select:none;user-select:none}
+#vid{display:none}
+.ov{position:absolute;inset:0;display:grid;place-items:center;padding:20px;background:rgba(10,10,12,.55);backdrop-filter:blur(3px);overflow-y:auto}
+.ov.clear{background:rgba(10,10,12,.15);backdrop-filter:none;place-items:end center;pointer-events:none}
+.ov.clear .card{pointer-events:auto}
+.card{width:min(560px,100%);background:var(--panel);border:2px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.card.wide{width:min(720px,100%)}
+h1{font:400 clamp(36px,5vw,54px)/1.05 "Black Han Sans",sans-serif;margin:0 0 10px;color:var(--yel)}
+h2{font:400 clamp(26px,3.4vw,36px)/1.1 "Black Han Sans",sans-serif;margin:0 0 8px}
+.sub{color:var(--dim);margin:0 0 18px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 20px;padding:0;list-style:none;font-size:14px}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend svg{width:22px;height:22px}
+.row1{display:flex;gap:10px}
+.roomin{width:100%;margin-bottom:10px;letter-spacing:.15em;text-transform:uppercase}
+.roomline{margin:0 0 10px;font-size:15px;color:var(--dim)}.roomline b{color:var(--yel);font-size:20px;letter-spacing:.12em;margin-left:6px}
+#hCode{font:400 clamp(44px,6vw,72px)/1 "Black Han Sans",sans-serif;color:var(--yel);letter-spacing:.12em;margin:4px 0 12px}
+input{flex:1;font:700 18px "Noto Sans KR",sans-serif;padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:#0f0f12;color:var(--ink);outline:none}
+input:focus{border-color:var(--yel)}
+.btn{font:900 17px "Noto Sans KR",sans-serif;padding:14px 22px;border-radius:12px;border:0;background:var(--yel);color:#141414;cursor:pointer;min-height:48px;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn.danger{background:var(--red);color:#fff}
+.btn:focus-visible,.link:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.status{margin:12px 0 0;font-size:14px;color:var(--dim);min-height:21px}
+.status.err{color:var(--red)}
+.link{background:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;font:14px "Noto Sans KR",sans-serif;padding:8px 0}
+.pill.bad{color:var(--red)}
+.pill{display:inline-block;font-weight:900;font-size:14px;padding:4px 12px;border-radius:999px;background:#26262d;color:var(--teal)}
+#hud{position:absolute;inset:0;pointer-events:none}
+#bar{position:absolute;left:0;top:0;height:8px;background:var(--yel);width:100%}
+#time{position:absolute;left:24px;top:22px;font:400 64px/1 "Black Han Sans",sans-serif;text-shadow:0 3px 12px rgba(0,0,0,.6)}
+#time.hot{color:var(--red)}
+#scoreBox{position:absolute;right:24px;top:20px;text-align:right;text-shadow:0 3px 12px rgba(0,0,0,.6)}
+#score{font:400 64px/1 "Black Han Sans",sans-serif;color:var(--yel)}
+#combo{font-weight:900;font-size:20px;color:var(--teal);min-height:30px}
+#myRank{font-weight:700;font-size:16px}
+#player{position:absolute;left:24px;bottom:18px;font-weight:900;font-size:18px;background:rgba(0,0,0,.5);padding:6px 14px;border-radius:999px}
+#note{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:6px 14px;border-radius:999px;font-size:14px;color:var(--yel);white-space:nowrap;pointer-events:none}
+#count b{font:400 min(26vw,200px)/1 "Black Han Sans",sans-serif;color:var(--yel);text-shadow:0 8px 40px rgba(0,0,0,.6);text-align:center}
+aside{background:var(--panel);border-left:2px solid var(--line);display:flex;flex-direction:column;padding:20px 16px;overflow:hidden}
+aside h3{font:400 28px/1.1 "Black Han Sans",sans-serif;margin:0}
+#cnt{color:var(--dim);font-size:14px;margin:4px 0 12px}
+ol.rk{list-style:none;margin:0;padding:0;flex:1;overflow-y:auto}
+ol.rk li{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;margin-bottom:6px;background:#222228}
+ol.rk .n{font:400 20px "Black Han Sans",sans-serif;color:var(--dim);text-align:center}
+ol.rk li.g1 .n{color:var(--yel)}ol.rk li.g2 .n{color:#d6d6d6}ol.rk li.g3 .n{color:#e09a5a}
+ol.rk .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ol.rk .sc{font:400 22px "Black Han Sans",sans-serif;font-variant-numeric:tabular-nums}
+ol.rk li.me{background:var(--yel);color:#141414}ol.rk li.me .n{color:#141414}
+ol.rk li.off{opacity:.45}
+ol.rk .dot{width:10px;height:10px;border-radius:50%;background:var(--teal);justify-self:center}
+.empty{color:var(--dim);font-size:15px;padding:14px 4px}
+.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:10px;margin:16px 0}
+.podium div{text-align:center}
+.podium .nm{font-weight:900;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podium .sc{color:var(--dim);font-weight:700}
+.podium .blk{margin-top:8px;border-radius:12px 12px 0 0;display:grid;place-items:center;font:400 34px "Black Han Sans",sans-serif;color:#141414}
+.podium .p1 .blk{height:120px;background:var(--yel)}.podium .p2 .blk{height:88px;background:#d6d6d6}.podium .p3 .blk{height:64px;background:#e09a5a}
+#myFinal{font-size:18px;font-weight:700;margin:0 0 10px}#myFinal b{color:var(--teal)}
+.flist{max-height:30vh}
+
+/* ---------- 진행자 화면 ---------- */
+#host{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr);background:var(--bg);overflow:auto}
+.hhead{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:18px max(3vw,16px);border-bottom:2px solid var(--line);background:var(--panel)}
+.hhead h1{font-size:34px;margin:0}
+.hhead .sp{flex:1}
+.hbody{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;padding:24px max(3vw,16px)}
+.hmain{display:flex;flex-direction:column;min-height:0}
+#hState{font:400 clamp(30px,4vw,48px)/1.1 "Black Han Sans",sans-serif;margin:0 0 6px}
+#hSub{color:var(--dim);margin:0 0 16px;font-size:18px}
+#hTimer{font:400 clamp(70px,10vw,140px)/1 "Black Han Sans",sans-serif;color:var(--yel);margin:0 0 10px}
+#hTimer.hot{color:var(--red)}
+.chips{display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start}
+.chips span{background:#26262d;border:2px solid var(--line);padding:10px 18px;border-radius:999px;font-weight:900;font-size:20px}
+.chips span.off{opacity:.4}
+#hBoard ol.rk li{padding:12px 16px;font-size:20px}
+#hBoard ol.rk .sc{font-size:28px}
+#hBoard ol.rk{columns:2;column-gap:12px;display:block}
+#hBoard ol.rk li{break-inside:avoid}
+.hside{background:var(--panel);border:2px solid var(--line);border-radius:20px;padding:20px;align-self:start;text-align:center}
+#qr{background:#fff;padding:12px;border-radius:14px;display:inline-block;margin:10px 0}
+#qr img,#qr canvas{display:block;width:220px;height:220px}
+#joinUrl{word-break:break-all;font-weight:700;font-size:15px}
+.hbtns{display:flex;gap:10px;flex-wrap:wrap}
+#hStart{font-size:22px;padding:16px 30px}
+#hConfirm{font-size:15px}
+
+@media(max-width:900px){
+  #app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+  aside{display:block;overflow-y:auto;border-left:0;border-top:2px solid var(--line);padding:10px 12px;height:min(30dvh,230px)}
+  aside h3{font-size:20px;display:inline}#cnt{display:inline;margin-left:8px}
+  ol.rk{margin-top:8px}ol.rk li{padding:6px 10px;margin-bottom:4px;grid-template-columns:28px minmax(0,1fr) auto}ol.rk .sc,ol.rk .n{font-size:18px}
+  .ov{place-items:start center;padding:12px}.ov.clear{place-items:end center}
+  .card{padding:20px;border-radius:16px}
+  .sub{font-size:14px;margin-bottom:12px}.legend{font-size:13px;margin-bottom:14px;gap:6px 12px}
+  #time,#score{font-size:42px}#time{left:14px;top:16px}#scoreBox{right:14px;top:14px}#combo{font-size:15px;min-height:22px}#myRank{font-size:14px}
+  #player{left:14px;bottom:10px;font-size:14px}
+  .hbody{grid-template-columns:1fr}#hBoard ol.rk{columns:1}
+}
+@media(max-width:420px){.row1{flex-direction:column}}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="stage">
+    <canvas id="cv" width="1280" height="720"></canvas>
+    <video id="vid" playsinline muted></video>
+
+    <div id="hud" hidden>
+      <div id="bar"></div>
+      <div id="time">60</div>
+      <div id="scoreBox"><div id="score">0</div><div id="combo"></div><div id="myRank"></div></div>
+      <div id="player"></div>
+    </div>
+    <div id="note" hidden></div>
+
+    <!-- 1. 입장 화면 -->
+    <section id="join" class="ov">
+      <div class="card">
+        <h1>도형 잡기 챌린지</h1>
+        <p class="sub">카메라 앞에서 손을 펼쳤다가 <b>주먹을 쥐거나 집게처럼 꼬집어</b> 떨어지는 도형을 잡으세요. 카메라가 없으면 <b>마우스 클릭·화면 터치</b>로 잡으면 됩니다. 여러 선생님과 동시에 겨루는 게임이에요!</p>
+        <ul class="legend">
+          <li><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#1ec8b0"/></svg>동그라미 +10</li>
+          <li><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="#ffd23f"/></svg>네모 +15</li>
+          <li><svg viewBox="0 0 24 24"><path d="M12 2 22 20H2z" fill="#ff8a3d"/></svg>세모 +20</li>
+          <li><svg viewBox="0 0 24 24"><path d="M12 1.5l3 7 7.5.6-5.7 4.9 1.8 7.4L12 17.5l-6.6 3.9 1.8-7.4L1.5 9.1 9 8.5z" fill="#ff4fa3"/></svg>별 +40</li>
+          <li><svg viewBox="0 0 24 24"><path d="M12 1l2 5 5-2-2 5 5 2-5 2 2 5-5-2-2 5-2-5-5 2 2-5-5-2 5-2-2-5 5 2z" fill="#ff3b30"/></svg>가시 −25</li>
+        </ul>
+        <form id="joinForm">
+          <p id="roomFixed" class="roomline" hidden>방 코드 <b id="roomFixedCode"></b></p>
+          <input id="room" class="roomin" maxlength="6" placeholder="방 코드 (진행자 화면에 있어요)" autocomplete="off" autocapitalize="characters" aria-label="방 코드">
+          <div class="row1">
+            <input id="nick" maxlength="10" placeholder="이름을 입력하세요" autocomplete="off" aria-label="이름">
+            <button class="btn" type="submit">입장하기</button>
+          </div>
+        </form>
+        <p id="status" class="status"></p>
+        <button id="hostLink" class="link" type="button">진행자이신가요? 진행자 화면 열기</button>
+      </div>
+    </section>
+
+    <!-- 2. 대기실 (뒤에서 연습 가능) -->
+    <section id="wait" class="ov clear" hidden>
+      <div class="card">
+        <h2 id="waitTitle">입장 완료!</h2>
+        <p class="sub" id="waitMsg">진행자가 시작 버튼을 누르면 모든 선생님이 동시에 시작해요. 기다리는 동안 떨어지는 도형을 잡으며 연습해 보세요. (연습 점수는 기록되지 않아요)</p>
+        <p style="display:flex;flex-wrap:wrap;gap:8px"><span class="pill" id="netStatus">진행자와 연결 중…</span><span class="pill" id="camStatus">카메라 준비 중…</span></p>
+        <button id="leaveBtn" class="link" type="button">이름·방 코드 바꾸기</button>
+      </div>
+    </section>
+
+    <!-- 3. 카운트다운 -->
+    <div id="count" class="ov" hidden><b id="countN">3</b></div>
+
+    <!-- 4. 최종 랭킹 -->
+    <section id="final" class="ov" hidden>
+      <div class="card wide">
+        <h2>최종 랭킹</h2>
+        <div class="podium" id="podium"></div>
+        <p id="myFinal"></p>
+        <ol class="rk flist" id="finalList"></ol>
+        <p class="sub" style="margin:12px 0 0">진행자가 다시 시작하면 다음 게임이 바로 시작돼요.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <aside>
+    <h3 id="sideTitle">참여자</h3>
+    <div id="cnt"></div>
+    <ol class="rk" id="rankList"></ol>
+  </aside>
+</div>
+
+<!-- ===== 진행자 화면 ===== -->
+<section id="host" hidden>
+  <header class="hhead">
+    <h1>도형 잡기 · 진행자</h1>
+    <span class="pill" id="hCount">참여자 0명</span>
+    <span class="sp"></span>
+    <div class="hbtns">
+      <button class="btn" id="hStart" type="button">게임 시작</button>
+      <button class="btn ghost" id="hLobby" type="button">대기실로</button>
+      <button class="btn ghost" id="hClear" type="button">참여자 비우기</button>
+    </div>
+    <div id="hConfirm" hidden>참여자 목록을 모두 지울까요? 선생님들은 다시 입장해야 해요.
+      <button class="btn danger" id="hYes" type="button">지우기</button> <button class="btn ghost" id="hNo" type="button">취소</button></div>
+  </header>
+  <div class="hbody">
+    <div class="hmain">
+      <p id="hState">참여자를 기다리는 중</p>
+      <p id="hSub">선생님들이 QR코드로 접속하거나 방 코드를 입력하면 아래에 이름이 나타나요.</p>
+      <div id="hTimer" hidden>60</div>
+      <div id="hBoard"></div>
+    </div>
+    <div class="hside">
+      <b>방 코드</b>
+      <div id="hCode">-----</div>
+      <span class="pill" id="hNet">연결 준비 중…</span>
+      <div><div id="qr"></div></div>
+      <div id="joinUrl"></div>
+      <p class="sub" style="margin:12px 0 0;font-size:14px">게임 시간 <b id="hDur">60</b>초 · 이 화면을 닫으면 게임이 끊겨요</p>
+    </div>
+  </div>
+</section>
+
+<script type="module">
+{
+const CFG = window.GAME_CONFIG || {};
+const DUR = Math.max(10, Number(CFG.GAME_SECONDS) || 60) * 1000;
+const URL_ROOM = (new URLSearchParams(location.search).get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+const PEER_PREFIX = 'shapecatch-v1-';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const MP_VER = '0.10.14';
+const MP_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/vision_bundle.mjs`;
+const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/wasm`;
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ss = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} } };
+
+/* ================= 실시간 연결 (PeerJS · 진행자 브라우저가 서버 역할) ================= */
+const peerOpts = () => Object.assign({ debug: 0 }, CFG.PEER_SERVER || {});
+function emitter() { const subs = { state: [], players: [] }; return { subs, state: v => subs.state.forEach(f => f(v)), players: v => subs.players.forEach(f => f(v)) }; }
+
+/* 진행자: 모든 상태를 가지고 있다가 참가자에게 뿌려 줌 */
+function hostApi(code, onStatus) {
+  const E = emitter(), KEY = 'shapeCatch.hostData.' + code;
+  let st = { RS: null, PL: {} };
+  try { const v = JSON.parse(ss.get(KEY) || 'null'); if (v && v.PL) st = v; } catch (e) {}
+  for (const k in st.PL) st.PL[k].online = false;
+  const conns = new Map();
+  let timer = 0;
+  const snapshot = () => ({ t: 'sync', RS: st.RS, PL: st.PL });
+  const broadcast = () => {
+    if (timer) return;
+    timer = setTimeout(() => { timer = 0; const m = snapshot(); for (const c of conns.keys()) if (c.open) { try { c.send(m); } catch (e) {} } }, 120);
+  };
+  const changed = () => { ss.set(KEY, JSON.stringify(st)); E.state(st.RS); E.players(st.PL); broadcast(); };
+  function handle(conn, m) {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'ping') { try { conn.send({ t: 'pong', c: m.c, h: Date.now() }); } catch (e) {} return; }
+    const id = String(m.pid || '').slice(0, 40);
+    if (!id) return;
+    if (m.t === 'join') {
+      const name = String(m.name || '').trim().slice(0, 10);
+      if (!name) return;
+      conns.set(conn, id);
+      const old = st.PL[id] || { score: 0, round: -1, joinedAt: Date.now() };
+      st.PL[id] = { ...old, name, online: true };
+      changed();
+    } else if (m.t === 'upd') {
+      const pl = st.PL[id];
+      if (!pl) return;
+      if (typeof m.score === 'number' && isFinite(m.score)) pl.score = Math.max(0, Math.min(99999, Math.round(m.score)));
+      if (typeof m.round === 'number') pl.round = m.round;
+      pl.online = true;
+      changed();
+    } else if (m.t === 'leave') {
+      delete st.PL[id]; conns.set(conn, null); changed();
+    }
+  }
+  let peer = null;
+  function open(attempt) {
+    peer = new Peer(PEER_PREFIX + code, peerOpts());
+    peer.on('open', () => onStatus('ok'));
+    peer.on('connection', conn => {
+      conns.set(conn, null);
+      conn.on('open', () => { try { conn.send(snapshot()); } catch (e) {} });
+      conn.on('data', m => handle(conn, m));
+      const bye = () => {
+        if (!conns.has(conn)) return;
+        const id = conns.get(conn); conns.delete(conn);
+        if (id && st.PL[id] && ![...conns.values()].includes(id)) { st.PL[id].online = false; changed(); }
+      };
+      conn.on('close', bye); conn.on('error', bye);
+    });
+    peer.on('error', e => {
+      console.warn('peer', e.type, e);
+      if (e.type === 'unavailable-id') { onStatus('busy'); try { peer.destroy(); } catch (_) {} if (attempt < 10) setTimeout(() => open(attempt + 1), 3000); }
+      else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) onStatus('net');
+      else if (e.type === 'browser-incompatible') onStatus('nolib');
+    });
+    peer.on('disconnected', () => { onStatus('net'); setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch (e) {} }, 2000); });
+  }
+  if (!window.Peer) setTimeout(() => onStatus('nolib')); else open(0);
+  setInterval(() => { if (conns.size) broadcast(); }, 2000);
+  return {
+    now: () => Date.now(),
+    onState: cb => { E.subs.state.push(cb); setTimeout(() => cb(st.RS)); },
+    onPlayers: cb => { E.subs.players.push(cb); setTimeout(() => cb(st.PL)); },
+    setState: o => { st.RS = o; changed(); },
+    clearPlayers: () => { st.PL = {}; changed(); },
+    joinPlayer() {}, updatePlayer() {}, removePlayer() {}, forget() {}, close() {}
+  };
+}
+
+/* 참가자: 진행자에게 접속해서 점수를 보내고, 전체 상태를 받음 */
+function clientApi(code, onStatus) {
+  const E = emitter();
+  let offset = 0, bestRtt = Infinity, conn = null, peer = null, me = null, closed = false, retry = 0, rt = 0;
+  const send = m => { if (conn && conn.open) { try { conn.send(m); } catch (e) {} } };
+  function retryLater() {
+    if (closed || rt) return;
+    rt = setTimeout(() => { rt = 0; if (conn && conn.open) return; connect(); }, Math.min(8000, 1500 * (++retry)));
+  }
+  function dial() {
+    if (closed) return;
+    const c = peer.connect(PEER_PREFIX + code, { reliable: true });
+    conn = c;
+    c.on('open', () => {
+      retry = 0; onStatus('ok');
+      for (let i = 0; i < 5; i++) setTimeout(() => send({ t: 'ping', c: Date.now() }), i * 300);
+      if (me) send({ t: 'join', ...me });
+    });
+    c.on('data', m => {
+      if (!m || typeof m !== 'object') return;
+      if (m.t === 'pong') { const now = Date.now(), rtt = now - m.c; if (rtt <= bestRtt) { bestRtt = rtt; offset = m.h + rtt / 2 - now; } }
+      else if (m.t === 'sync') { E.state(m.RS || null); E.players(m.PL || {}); }
+    });
+    c.on('close', () => { if (conn === c && !closed) { onStatus('lost'); retryLater(); } });
+    c.on('error', () => { if (conn === c) retryLater(); });
+  }
+  function connect() {
+    if (closed) return;
+    if (!peer || peer.destroyed) {
+      peer = new Peer(peerOpts());
+      peer.on('open', dial);
+      peer.on('error', e => {
+        console.warn('peer', e.type, e);
+        if (e.type === 'peer-unavailable') onStatus('nohost');
+        else if (e.type === 'browser-incompatible') { onStatus('nolib'); return; }
+        else onStatus('net');
+        if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) { try { peer.destroy(); } catch (_) {} }
+        retryLater();
+      });
+      peer.on('disconnected', () => { try { if (!peer.destroyed) peer.reconnect(); } catch (e) {} });
+    } else if (peer.open) dial();
+    else retryLater();
+  }
+  if (!window.Peer) setTimeout(() => onStatus('nolib')); else connect();
+  const pinger = setInterval(() => send({ t: 'ping', c: Date.now() }), 10000);
+  return {
+    now: () => Date.now() + offset,
+    onState: cb => E.subs.state.push(cb),
+    onPlayers: cb => E.subs.players.push(cb),
+    setState() {}, clearPlayers() {},
+    joinPlayer: (id, data) => { me = { pid: id, name: data.name }; send({ t: 'join', ...me }); },
+    updatePlayer: (id, o) => send({ t: 'upd', pid: id, ...o }),
+    removePlayer: id => { send({ t: 'leave', pid: id }); me = null; },
+    forget: () => { me = null; },
+    close: () => { closed = true; clearInterval(pinger); clearTimeout(rt); try { if (peer) peer.destroy(); } catch (e) {} }
+  };
+}
+
+let api = null, apiCode = '';
+function attach(a) {
+  a.onState(s => { RS = s && s.status ? s : { status: 'lobby', round: (s && s.round) || 0 }; onRemote(); });
+  a.onPlayers(p => {
+    PL = p || {};
+    if (joined && !isHost) { if (named(PL[pid])) seenSelf = true; else if (seenSelf) { kicked(); return; } }
+    if (isHost) renderHost(); else renderSide();
+  });
+}
+const NET_TXT = {
+  ok: ['진행자와 연결됨', false],
+  nohost: ['진행자 화면을 찾을 수 없어요. 방 코드를 확인해 주세요 (다시 시도 중…)', true],
+  net: ['인터넷 연결이 불안정해요. 다시 연결하는 중…', true],
+  lost: ['연결이 끊겼어요. 다시 연결하는 중…', true],
+  nolib: ['연결 도구를 불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요', true]
+};
+function clientStatus(k) { const [t, bad] = NET_TXT[k] || NET_TXT.net; const el = $('netStatus'); el.textContent = t; el.classList.toggle('bad', bad); }
+
+/* ================= 공통 상태 ================= */
+let pid = ss.get('shapeCatch.pid');
+if (!pid) { pid = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); ss.set('shapeCatch.pid', pid); }
+let RS = { status: 'lobby', round: 0 }, PL = {};
+let phase = 'join', isHost = false, joined = false, seenSelf = false, myName = '', myRound = -1;
+let score = 0, combo = 0, lastCatch = 0, dirty = false, lastCount = null, lastSec = -1;
+
+const named = p => p && typeof p.name === 'string' && p.name;
+function roundRows(round) {
+  return Object.entries(PL).filter(([, p]) => named(p) && p.round === round)
+    .map(([id, p]) => ({ id, name: p.name, score: (!isHost && id === pid && (phase === 'play' || phase === 'final')) ? score : (p.score || 0), online: p.online !== false, at: p.joinedAt || 0 }))
+    .sort((a, b) => b.score - a.score || a.at - b.at);
+}
+function onlineRows() {
+  return Object.entries(PL).filter(([, p]) => named(p) && p.online !== false)
+    .map(([id, p]) => ({ id, name: p.name, at: p.joinedAt || 0 })).sort((a, b) => a.at - b.at);
+}
+const rowHtml = (r, i, meId) => `<li class="g${i + 1}${r.id === meId ? ' me' : ''}${r.online === false ? ' off' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(r.name)}</span><span class="sc">${r.score}</span></li>`;
+function podiumHtml(rows) {
+  const at = i => rows[i] ? `<div class="p${i + 1}"><div class="nm">${esc(rows[i].name)}</div><div class="sc">${rows[i].score}점</div><div class="blk">${i + 1}</div></div>` : `<div class="p${i + 1}"></div>`;
+  return at(1) + at(0) + at(2);
+}
+
+/* ================= 참가자 화면 ================= */
+function show(id) {
+  for (const k of ['join', 'wait', 'count', 'final']) $(k).hidden = k !== id;
+  $('hud').hidden = !(id === 'count' || id === null);
+}
+const setStatus = (t, err) => { const el = $('status'); el.textContent = t; el.classList.toggle('err', !!err); };
+let noteT = 0;
+function note(t, ms = 4000) { const n = $('note'); n.textContent = t; n.hidden = false; clearTimeout(noteT); noteT = setTimeout(() => { n.hidden = true; }, ms); }
+
+function renderSide() {
+  if (isHost) return;
+  const live = (phase === 'count' || phase === 'play' || phase === 'final') && myRound >= 0;
+  if (live) {
+    const rows = roundRows(myRound);
+    $('sideTitle').textContent = '실시간 랭킹';
+    $('cnt').textContent = `${rows.length}명 참여 중`;
+    $('rankList').innerHTML = rows.length ? rows.map((r, i) => rowHtml(r, i, pid)).join('') : '<li class="empty">참여자를 불러오는 중…</li>';
+    const mi = rows.findIndex(r => r.id === pid);
+    $('myRank').textContent = mi >= 0 ? `현재 ${mi + 1}위 / ${rows.length}명` : '';
+    if (phase === 'final') renderFinal(rows, mi);
+  } else {
+    const rows = onlineRows();
+    $('sideTitle').textContent = '참여자';
+    $('cnt').textContent = `${rows.length}명 입장`;
+    $('rankList').innerHTML = rows.length
+      ? rows.map(r => `<li class="${r.id === pid ? 'me' : ''}"><span class="dot"></span><span class="nm">${esc(r.name)}</span><span></span></li>`).join('')
+      : '<li class="empty">아직 입장한 선생님이 없어요.</li>';
+  }
+}
+function renderFinal(rows, mi) {
+  $('podium').innerHTML = podiumHtml(rows);
+  $('myFinal').innerHTML = mi >= 0 ? `${esc(myName)} 선생님은 <b>${rows.length}명 중 ${mi + 1}위</b> · ${rows[mi].score}점` : '';
+  $('finalList').innerHTML = rows.slice(3).map((r, i) => rowHtml(r, i + 3, pid)).join('');
+}
+
+function onRemote() {
+  if (isHost) { renderHost(); return; }
+  if (!joined) return;
+  if (RS.status === 'playing' && RS.round !== myRound) {
+    if (api.now() < RS.startAt + 3000) {
+      myRound = RS.round; score = 0; combo = 0; shapes = []; lastCount = null; lastSec = -1;
+      api.updatePlayer(pid, { score: 0, round: myRound });
+      $('score').textContent = '0'; $('combo').textContent = ''; $('time').classList.remove('hot');
+      $('bar').style.background = 'var(--yel)'; $('player').textContent = myName;
+      phase = 'count'; show('count');
+    } else if (phase === 'wait') {
+      $('waitMsg').textContent = '지금 진행 중인 게임이 끝나면 다음 게임부터 함께할 수 있어요. 그동안 연습해 보세요!';
+    }
+  } else if (RS.status === 'lobby' && phase !== 'wait') {
+    phase = 'wait'; shapes = []; show('wait');
+    $('waitMsg').textContent = '진행자가 시작 버튼을 누르면 모든 선생님이 동시에 시작해요. 기다리는 동안 떨어지는 도형을 잡으며 연습해 보세요. (연습 점수는 기록되지 않아요)';
+  } else if (RS.status === 'ended' && RS.round === myRound && (phase === 'play' || phase === 'count')) {
+    finishLocal();
+  }
+  renderSide();
+}
+
+function beginPlay() { phase = 'play'; shapes = []; show(null); note('주먹을 쥐거나, 클릭·탭해서 잡으세요!', 2500); renderSide(); }
+function finishLocal() {
+  phase = 'final'; shapes = [];
+  if (named(PL[pid])) api.updatePlayer(pid, { score, round: myRound });
+  dirty = false;
+  show('final'); renderSide();
+  beep(523, .15, 'triangle'); setTimeout(() => beep(784, .3, 'triangle'), 160);
+}
+setInterval(() => { if (dirty && joined && phase === 'play' && named(PL[pid])) { dirty = false; api.updatePlayer(pid, { score, round: myRound }); } }, 400);
+
+function kicked() {
+  joined = false; seenSelf = false; myRound = -1; phase = 'join'; shapes = []; api.forget();
+  show('join'); setStatus('진행자가 참여자 목록을 비웠어요. 이름을 입력해 다시 입장해 주세요.', true); renderSide();
+}
+
+$('joinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const code = (URL_ROOM || $('room').value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const name = $('nick').value.trim();
+  if (code.length < 4) { setStatus('진행자 화면에 있는 방 코드를 입력해 주세요.', true); $('room').focus(); return; }
+  if (!name) { setStatus('이름을 입력해 주세요.', true); $('nick').focus(); return; }
+  myName = name; ss.set('shapeCatch.name', name); ss.set('shapeCatch.room', code);
+  if (!api || apiCode !== code) {
+    if (api) api.close();
+    RS = { status: 'lobby', round: 0 }; PL = {};
+    $('netStatus').textContent = '진행자와 연결 중…'; $('netStatus').classList.remove('bad');
+    api = clientApi(code, clientStatus); apiCode = code; attach(api);
+  }
+  joined = true; seenSelf = false; myRound = -1;
+  api.joinPlayer(pid, { name });
+  $('waitTitle').textContent = `${name} 선생님, 입장 완료!`;
+  phase = 'wait'; show('wait');
+  initAudio(); prepareCam(); onRemote();
+});
+$('leaveBtn').addEventListener('click', () => {
+  joined = false; seenSelf = false; if (api) api.removePlayer(pid); phase = 'join'; shapes = [];
+  show('join'); setStatus(''); $('nick').focus(); renderSide();
+});
+
+/* ================= 진행자 ================= */
+function makeCode() { let c = ''; const r = crypto.getRandomValues(new Uint32Array(5)); for (const x of r) c += CODE_CHARS[x % CODE_CHARS.length]; return c; }
+const HOST_NET = { ok: ['참가자 접속 가능', false], busy: ['방 준비 중… 잠시만 기다려 주세요', true], net: ['인터넷 연결이 불안정해요. 다시 연결 중…', true], nolib: ['연결 도구를 불러오지 못했어요. 새로고침해 주세요', true] };
+function enterHost() {
+  if (isHost) return;
+  isHost = true; phase = 'host';
+  const code = URL_ROOM || ss.get('shapeCatch.hostCode') || makeCode();
+  ss.set('shapeCatch.hostCode', code);
+  const joinUrl = location.origin + location.pathname + '?room=' + code;
+  try { history.replaceState(null, '', location.pathname + '?host&room=' + code); } catch (e) {}
+  $('app').hidden = true; $('host').hidden = false;
+  $('hCode').textContent = code; $('joinUrl').textContent = joinUrl; $('hDur').textContent = DUR / 1000;
+  try { if (window.QRCode) new QRCode($('qr'), { text: joinUrl, width: 220, height: 220, colorDark: '#141414', colorLight: '#ffffff' }); else $('qr').hidden = true; } catch (e) { $('qr').hidden = true; }
+  api = hostApi(code, k => { const [t, bad] = HOST_NET[k] || HOST_NET.net; $('hNet').textContent = t; $('hNet').classList.toggle('bad', bad); });
+  apiCode = code; attach(api);
+  renderHost();
+}
+$('hostLink').addEventListener('click', enterHost);
+function hostPhase() {
+  if (RS.status === 'playing') return api.now() < RS.startAt ? 'count' : 'play';
+  return RS.status === 'ended' ? 'ended' : 'lobby';
+}
+function renderHost() {
+  if (!isHost) return;
+  const on = onlineRows(), hp = hostPhase();
+  $('hCount').textContent = `참여자 ${on.length}명`;
+  $('hStart').disabled = hp === 'count' || hp === 'play';
+  $('hStart').textContent = hp === 'ended' ? '다시 시작' : '게임 시작';
+  $('hTimer').hidden = !(hp === 'count' || hp === 'play');
+  if (hp === 'lobby') {
+    $('hState').textContent = on.length ? `${on.length}명 입장 완료` : '참여자를 기다리는 중';
+    $('hSub').textContent = on.length ? '모두 들어오면 [게임 시작]을 눌러 주세요.' : '선생님들이 QR코드로 접속하거나 방 코드를 입력하면 아래에 이름이 나타나요.';
+    $('hBoard').innerHTML = `<div class="chips">${on.map(r => `<span>${esc(r.name)}</span>`).join('')}</div>`;
+  } else {
+    const rows = roundRows(RS.round);
+    const late = on.filter(r => !rows.some(x => x.id === r.id)).length;
+    if (hp === 'ended') {
+      $('hState').textContent = '게임 종료! 최종 랭킹';
+      $('hSub').textContent = `${rows.length}명 참여` + (late ? ` · 대기 중 ${late}명은 다음 게임부터 참여해요` : '');
+      $('hBoard').innerHTML = `<div class="podium">${podiumHtml(rows)}</div><ol class="rk">${rows.slice(3).map((r, i) => rowHtml(r, i + 3)).join('')}</ol>`;
+    } else {
+      $('hState').textContent = hp === 'count' ? '곧 시작합니다!' : '게임 진행 중 · 실시간 랭킹';
+      $('hSub').textContent = `${rows.length}명 참여 중` + (late ? ` · 대기 ${late}명` : '');
+      $('hBoard').innerHTML = `<ol class="rk">${rows.map((r, i) => rowHtml(r, i)).join('') || '<li class="empty">참여자를 기다리는 중…</li>'}</ol>`;
+    }
+  }
+}
+$('hStart').addEventListener('click', () => {
+  if (!onlineRows().length) { $('hSub').textContent = '아직 입장한 선생님이 없어요. 참여자가 들어온 뒤 시작해 주세요.'; return; }
+  api.setState({ status: 'playing', round: (RS.round || 0) + 1, startAt: api.now() + 4000, dur: DUR });
+});
+$('hLobby').addEventListener('click', () => api.setState({ ...RS, status: 'lobby' }));
+$('hClear').addEventListener('click', () => { $('hConfirm').hidden = false; });
+$('hNo').addEventListener('click', () => { $('hConfirm').hidden = true; });
+$('hYes').addEventListener('click', () => { api.clearPlayers(); $('hConfirm').hidden = true; });
+let hostEndSent = 0;
+setInterval(() => {
+  if (!isHost) return;
+  const hp = hostPhase();
+  if (hp === 'count' || hp === 'play') {
+    const left = hp === 'count' ? RS.startAt - api.now() : RS.startAt + RS.dur - api.now();
+    $('hTimer').textContent = hp === 'count' ? Math.ceil(left / 1000) : Math.max(0, Math.ceil(left / 1000));
+    $('hTimer').classList.toggle('hot', hp === 'play' && left < 10000);
+  }
+  if (RS.status === 'playing' && api.now() > RS.startAt + RS.dur + 800 && hostEndSent !== RS.round) {
+    hostEndSent = RS.round; api.setState({ ...RS, status: 'ended' });
+  }
+  const want = hp === 'count' || hp === 'play' ? 'live' : hp;
+  if (want !== renderHost.last) { renderHost.last = want; renderHost(); }
+}, 200);
+
+/* ================= 카메라 & 손 인식 ================= */
+const cv = $('cv'), ctx = cv.getContext('2d'), vid = $('vid');
+let W = 1280, H = 720, S = 1, landmarker = null, CONN = null, camOn = false, lastVidTime = -1;
+const hands = [];
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+const hasCam = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+let modelPromise = null;
+function loadModel() {
+  if (!modelPromise) modelPromise = (async () => {
+    const mp = await import(MP_URL);
+    const fs = await mp.FilesetResolver.forVisionTasks(WASM);
+    const opts = d => ({ baseOptions: { modelAssetPath: MODEL, delegate: d }, runningMode: 'VIDEO', numHands: 2,
+      minHandDetectionConfidence: .5, minHandPresenceConfidence: .5, minTrackingConfidence: .5 });
+    try { landmarker = await mp.HandLandmarker.createFromOptions(fs, opts('GPU')); }
+    catch (e) { landmarker = await mp.HandLandmarker.createFromOptions(fs, opts('CPU')); }
+    CONN = mp.HandLandmarker.HAND_CONNECTIONS;
+  })();
+  return modelPromise;
+}
+async function startCam() {
+  if (!hasCam) throw new Error('no camera api');
+  const st = await withTimeout(navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false }), 12000);
+  vid.srcObject = st;
+  await vid.play();
+  W = cv.width = vid.videoWidth || 1280;
+  H = cv.height = vid.videoHeight || 720;
+  S = Math.max(.7, Math.min(W, H) / 720);
+  camOn = true;
+}
+async function prepareCam() {
+  const pill = $('camStatus');
+  if (!camOn) {
+    pill.textContent = '카메라 켜는 중… 권한을 허용해 주세요';
+    try { await startCam(); }
+    catch (e) { console.warn(e); pill.textContent = '카메라 없음 · 마우스 클릭/화면 터치로 잡아요'; return; }
+  }
+  if (!landmarker) {
+    pill.textContent = '손 인식 준비 중… (마우스·터치는 바로 가능)';
+    try { await withTimeout(loadModel(), 30000); }
+    catch (e) { console.warn(e); pill.textContent = '손 인식 불가 · 마우스 클릭/화면 터치로 잡아요'; return; }
+  }
+  pill.textContent = '손 인식 준비 완료 · 마우스·터치도 가능';
+}
+function fitCanvas() {
+  if (camOn) return;
+  const r = $('stage').getBoundingClientRect();
+  H = 720; W = Math.round(Math.min(1600, Math.max(360, 720 * r.width / Math.max(1, r.height))));
+  cv.width = W; cv.height = H;
+  S = Math.max(.7, Math.min(W, H) / 720);
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+function updateHands(res, now) {
+  const lms = (res && res.landmarks) || [];
+  for (let i = 0; i < 2; i++) {
+    const h = hands[i] || (hands[i] = { x: W / 2, y: H / 2, grab: false, win: 0, seen: false, lm: null });
+    const lm = lms[i];
+    if (!lm) { h.seen = false; h.grab = false; h.lm = null; continue; }
+    const P = k => ({ x: (1 - lm[k].x) * W, y: lm[k].y * H });
+    const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    let px = 0, py = 0;
+    for (const k of [0, 5, 9, 13, 17]) { const p = P(k); px += p.x; py += p.y; }
+    px /= 5; py /= 5;
+    const size = d(P(0), P(9)) || 1;
+    const curl = [8, 12, 16, 20].reduce((s, k) => s + d(P(k), { x: px, y: py }), 0) / 4 / size;
+    const pinch = d(P(4), P(8)) / size;
+    const closed = h.grab ? (curl < 1.0 || pinch < 0.45) : (curl < 0.8 || pinch < 0.28);
+    if (!h.seen) { h.x = px; h.y = py; }
+    h.x += (px - h.x) * .6; h.y += (py - h.y) * .6;
+    if (closed && !h.grab) h.win = now + 220;
+    h.grab = closed; h.seen = true; h.lm = lm;
+  }
+}
+
+/* 마우스·터치: 항상 사용 가능 */
+function toCanvas(e) {
+  const r = cv.getBoundingClientRect(), sc = Math.min(r.width / W, r.height / H);
+  return { x: (e.clientX - r.left - (r.width - W * sc) / 2) / sc, y: (e.clientY - r.top - (r.height - H * sc) / 2) / sc };
+}
+const ptr = { x: 0, y: 0, grab: false, win: 0, seen: false, lm: null, touch: false };
+hands[2] = ptr;
+cv.addEventListener('pointermove', e => { const p = toCanvas(e); ptr.x = p.x; ptr.y = p.y; if (e.pointerType === 'mouse' || ptr.grab) ptr.seen = true; });
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const p = toCanvas(e); ptr.x = p.x; ptr.y = p.y; ptr.grab = true; ptr.seen = true; ptr.win = performance.now() + 220;
+  ptr.touch = e.pointerType !== 'mouse';
+});
+const ptrUp = () => { ptr.grab = false; if (ptr.touch) { ptr.seen = false; ptr.touch = false; } };
+window.addEventListener('pointerup', ptrUp);
+window.addEventListener('pointercancel', ptrUp);
+cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr.seen = false; });
+
+/* ================= 사운드 ================= */
+let ac = null;
+function initAudio() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; } }
+function beep(f, d, type = 'sine', v = .15) {
+  if (!ac) return;
+  try {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(v, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + d);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+  } catch (e) {}
+}
+
+/* ================= 도형 ================= */
+const TYPES = {
+  circle: { pts: 10, color: '#1ec8b0', r: 50, w: 32 },
+  square: { pts: 15, color: '#ffd23f', r: 48, w: 26 },
+  tri:    { pts: 20, color: '#ff8a3d', r: 52, w: 20 },
+  star:   { pts: 40, color: '#ff4fa3', r: 44, w: 8, fast: 1.5 },
+  bomb:   { pts: -25, color: '#ff3b30', r: 46, w: 14 }
+};
+const TOTAL_W = Object.values(TYPES).reduce((s, t) => s + t.w, 0);
+const pick = () => { let r = Math.random() * TOTAL_W; for (const k in TYPES) { r -= TYPES[k].w; if (r <= 0) return k; } return 'circle'; };
+let shapes = [], fx = [], texts = [], nextSpawn = 0, shake = 0;
+
+function spawn(p) {
+  const type = pick(), T = TYPES[type], r = T.r * S;
+  const vy = (160 + p * 170) * (T.fast || 1) * (.85 + Math.random() * .3) * S;
+  shapes.push({ type, r, x: r + 20 + Math.random() * Math.max(10, W - 2 * r - 40), y: -r, vy, rot: Math.random() * 6, vr: (Math.random() - .5) * 2.4, ph: Math.random() * 6 });
+}
+function catchShape(s, now) {
+  const T = TYPES[s.type], real = phase === 'play';
+  let gain;
+  if (T.pts < 0) { gain = T.pts; if (real) combo = 0; shake = 14; beep(130, .3, 'sawtooth', .12); }
+  else {
+    if (real) { combo = now - lastCatch < 1600 ? combo + 1 : 1; lastCatch = now; }
+    gain = Math.round(T.pts * (real ? 1 + Math.min(combo - 1, 10) * .1 : 1));
+    beep(480 + Math.min(real ? combo : 1, 12) * 45, .12, 'triangle');
+  }
+  for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, v = (120 + Math.random() * 320) * S; fx.push({ x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: T.color }); }
+  texts.push({ x: s.x, y: s.y, t: real ? (gain > 0 ? '+' : '') + gain : '연습!', c: gain > 0 ? '#fff' : T.color, life: 1 });
+  if (!real) return;
+  score = Math.max(0, score + gain); dirty = true;
+  $('score').textContent = score;
+  $('combo').textContent = combo > 1 ? `${combo} 콤보! ×${(1 + Math.min(combo - 1, 10) * .1).toFixed(1)}` : '';
+  renderSide();
+}
+function drawShape(s) {
+  const T = TYPES[s.type], r = s.r;
+  ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+  ctx.shadowColor = T.color; ctx.shadowBlur = 26 * S;
+  ctx.fillStyle = T.color; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 4 * S;
+  ctx.beginPath();
+  if (s.type === 'circle') ctx.arc(0, 0, r, 0, Math.PI * 2);
+  else if (s.type === 'square') { const a = r * .82; if (ctx.roundRect) ctx.roundRect(-a, -a, a * 2, a * 2, r * .2); else ctx.rect(-a, -a, a * 2, a * 2); }
+  else {
+    const n = s.type === 'tri' ? 3 : s.type === 'star' ? 10 : 16;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / n;
+      const rr = s.type === 'tri' ? r : s.type === 'star' ? (i % 2 ? r * .45 : r) : (i % 2 ? r * .68 : r);
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+  ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.rotate(-s.rot);
+  ctx.fillStyle = s.type === 'bomb' ? '#fff' : '#141414';
+  ctx.font = `900 ${(s.type === 'star' ? 17 : 22) * S}px "Noto Sans KR",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(T.pts > 0 ? '+' + T.pts : String(T.pts), 0, s.type === 'tri' ? r * .22 : 2 * S);
+  ctx.restore();
+}
+function drawHands() {
+  for (const h of hands) {
+    if (!h || !h.seen) continue;
+    if (h.lm && CONN) {
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3 * S; ctx.beginPath();
+      for (const c of CONN) { const a = h.lm[c.start], b = h.lm[c.end]; ctx.moveTo((1 - a.x) * W, a.y * H); ctx.lineTo((1 - b.x) * W, b.y * H); }
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(h.x, h.y, (h.grab ? 26 : 40) * S, 0, Math.PI * 2);
+    ctx.lineWidth = 6 * S; ctx.strokeStyle = h.grab ? '#ffd23f' : '#fff'; ctx.stroke();
+    if (h.grab) { ctx.fillStyle = 'rgba(255,210,63,.35)'; ctx.fill(); }
+  }
+}
+function drawBg() {
+  if (camOn && vid.readyState >= 2) {
+    ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(vid, 0, 0, W, H); ctx.restore();
+    ctx.fillStyle = 'rgba(10,10,14,.38)'; ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#0d0d10'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1d1d23';
+    for (let x = 20; x < W; x += 40) for (let y = 20; y < H; y += 40) ctx.fillRect(x, y, 3, 3);
+  }
+}
+
+/* ================= 메인 루프 ================= */
+let lastFrame = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (isHost) return;
+  const dt = Math.min(.05, Math.max(0, (now - lastFrame) / 1000)); lastFrame = now;
+  if (landmarker && camOn && vid.readyState >= 2 && vid.currentTime !== lastVidTime) {
+    lastVidTime = vid.currentTime;
+    try { updateHands(landmarker.detectForVideo(vid, now), now); } catch (e) { console.error(e); }
+  }
+
+  if (phase === 'count') {
+    const left = RS.startAt - api.now(), n = Math.ceil(left / 1000);
+    if (left <= 0) beginPlay();
+    else if (n !== lastCount) { lastCount = n; $('countN').textContent = n > 3 ? '준비' : n; $('time').textContent = DUR / 1000; $('bar').style.width = '100%'; if (n <= 3) beep(600, .15, 'square', .07); }
+  }
+
+  ctx.save();
+  if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= .85; if (shake < .5) shake = 0; }
+  drawBg();
+
+  const active = phase === 'play' || phase === 'wait';
+  if (active) {
+    let p = 0;
+    if (phase === 'play') {
+      const dur = RS.dur || DUR, left = Math.max(0, RS.startAt + dur - api.now());
+      p = 1 - left / dur;
+      const sec = Math.ceil(left / 1000);
+      $('time').textContent = sec;
+      $('bar').style.width = (left / dur * 100) + '%';
+      if (sec <= 5 && sec !== lastSec && sec > 0) { $('time').classList.add('hot'); $('bar').style.background = 'var(--red)'; beep(880, .08, 'square', .06); }
+      lastSec = sec;
+      if (left <= 0) finishLocal();
+    }
+    if (now >= nextSpawn) {
+      spawn(p);
+      if (phase === 'play' && Math.random() < p * .5) spawn(p);
+      nextSpawn = now + (phase === 'play' ? (720 - p * 300) : 1300) * (.7 + Math.random() * .6);
+    }
+    for (const s of shapes) { s.y += s.vy * dt; s.rot += s.vr * dt; s.ph += dt * 2; s.x += Math.sin(s.ph) * 30 * S * dt; }
+    shapes = shapes.filter(s => s.y < H + s.r + 10);
+    for (const h of hands) {
+      if (!h || now > h.win) continue;
+      let best = -1, bd = Infinity;
+      shapes.forEach((s, i) => { const d = Math.hypot(s.x - h.x, s.y - h.y); if (d < s.r + 30 * S && d < bd) { bd = d; best = i; } });
+      if (best >= 0) { catchShape(shapes[best], now); shapes.splice(best, 1); h.win = 0; }
+    }
+  }
+
+  for (const s of shapes) drawShape(s);
+  for (const f of fx) { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 600 * S * dt; f.life -= dt * 1.6; }
+  fx = fx.filter(f => f.life > 0);
+  for (const f of fx) { ctx.globalAlpha = f.life; ctx.fillStyle = f.c; ctx.fillRect(f.x - 4 * S, f.y - 4 * S, 8 * S, 8 * S); }
+  ctx.globalAlpha = 1;
+  for (const t of texts) {
+    t.y -= 70 * S * dt; t.life -= dt * 1.2;
+    ctx.globalAlpha = Math.max(0, t.life); ctx.fillStyle = t.c;
+    ctx.font = `400 ${44 * S}px "Black Han Sans",sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(t.t, t.x, t.y);
+  }
+  texts = texts.filter(t => t.life > 0);
+  ctx.globalAlpha = 1;
+  drawHands();
+  ctx.restore();
+}
+
+/* ================= 시작 ================= */
+loadModel().catch(e => console.warn('손 인식 모델 로드 실패', e));
+const prevName = ss.get('shapeCatch.name'); if (prevName) $('nick').value = prevName;
+if (URL_ROOM) { $('room').hidden = true; $('roomFixed').hidden = false; $('roomFixedCode').textContent = URL_ROOM; }
+else { const pr = ss.get('shapeCatch.room'); if (pr) $('room').value = pr; }
+if (new URLSearchParams(location.search).has('host')) enterHost();
+renderSide();
+requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
